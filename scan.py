@@ -3,8 +3,7 @@ import serial.tools.list_ports
 import sys
 import time
 from datetime import datetime
-from test_model import Test, proccess_line, print_test
-from contextlib import contextmanager
+from test_model import new_test, proccess_line, print_test, deep_compare
 
 class FakeSerial:
     def __init__(self, log_path):
@@ -34,14 +33,7 @@ class FakeSerial:
 
         
 
-def replay_log_generator(filepath):
-    """
-    Generator that yields log lines at the correct delay based on their timestamps.
-    Lines without timestamps are yielded immediately.
-    
-    :param filepath: Path to the saved log file.
-    :yield: Line from the log file at the appropriate replay time.
-    """
+def replay_log_generator(filepath, speed_up_factor = 10.0):
     prev_timestamp = None
 
     with open(filepath, 'r') as f:
@@ -53,14 +45,12 @@ def replay_log_generator(filepath):
             try:
                 timestamp_str = line.split(']')[0].strip('[')
                 timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S.%f")
-                # If this line has a valid timestamp, do the sleep dance
                 if prev_timestamp:
-                    delta = (timestamp - prev_timestamp).total_seconds()
+                    delta = (timestamp - prev_timestamp).total_seconds() / speed_up_factor
                     time.sleep(max(delta, 0))
                 prev_timestamp = timestamp
-            except (IndexError, ValueError):
-                # No timestamp, or malformed — just yield it instantly
-                pass
+            except (IndexError, ValueError): #likely no timestamp present
+                time.sleep(0.01) # just a small 10ms delay
 
             yield line
 
@@ -103,9 +93,10 @@ def select_port(ports):
             print("That's not a number. Try again.")
 
 
-def read_serial_forever(port_name, baudrate=115200, simulate = False, read_log = ""):
-    serial_log = ""
+def read_serial_forever(port_name, baudrate=115200, simulate=False, read_log=""):
     file_name = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+    serial_log = ""
+    test = new_test()
 
     try:
         loop_iterable = (
@@ -115,25 +106,16 @@ def read_serial_forever(port_name, baudrate=115200, simulate = False, read_log =
         )
 
         with loop_iterable as ser:
-            test = Test()
-            test.flags = {
-                'done': False,
-                'inc_freq_with_fixed_step_parallel': False
-            }
             while True:
                 if ser.in_waiting:
                     line = ser.readline().decode(errors='replace').strip()
                     modified = proccess_line(line, test)
                     serial_log += line + '\n'
-
                     if modified:
                         print('>>>>> ' + line)
-                        #print_test(test)
-                    else:
-                        print("      " + line)
-
-
-                if test.flags['done']:
+                    #else:
+                        #print("      " + line)
+                if test['flags']['done']:
                     break
 
     except serial.SerialException as e:
@@ -141,20 +123,20 @@ def read_serial_forever(port_name, baudrate=115200, simulate = False, read_log =
     except KeyboardInterrupt:
         print("\nScanning stopped. Byeee!")
 
-    if len(serial_log) > 0:
-
-        if test.serial is not None:
-            file_name = test.serial #modify the filename to use the serial instead
-
+    if len(serial_log) > 0 and not simulate:
+        if test['serial'] is not None:
+            #modify the filename to use the serial instead
+            file_name = test['serial'] 
         file_path = f'dumps/{file_name}.txt'
-
         save_log(file_path, serial_log)
+
+    print_test(test) #print the test object when the test is over
 
 
 if __name__ == "__main__":
 
-    simulate = False
-    read_log = "dumps/serial-0.txt"
+    simulate = True
+    read_log = "dumps/YNAHYPDBBABCA0KVD-pass.txt"
     selected_port = None
 
     if not simulate:
