@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hashboard Tester UI</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+  <style>
+    body {
+      font-family: monospace;
+      background: #111;
+      color: #0f0;
+      padding: 1em;
+    }
+    .bad {
+      color: red;
+      font-weight: bold;
+    }
+    pre {
+      background: #222;
+      padding: 1em;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>🧪 Hashboard Tester UI</h1>
+    <div v-if="testData">
+      <h2>ID</h2>
+      <pre>{{ testData.id }}</pre>
+
+      <h2>PSU</h2>
+      <pre :class="{ bad: testData.psu.voltage === 0 }">{{ testData.psu }}</pre>
+
+      <h2>Temps</h2>
+      <pre>{{ testData.read }}</pre>
+
+      <h2>Results</h2>
+      <pre>{{ testData.results }}</pre>
+    </div>
+    <div v-else>
+      <p>Waiting for data...</p>
+    </div>
+  </div>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data: {
+        testData: null
+      },
+      created() {
+        // Use WebSocket or pywebview event
+        if (window.pywebview) {
+          window.pywebview.api.get_latest_test_data().then(data => {
+            this.testData = data;
+          });
+          
+          // Optional: listen for push updates from Python side
+          window.testUpdate = (data) => {
+            this.testData = data;
+          };
+        } else {
+          // Simulate for development
+          setInterval(() => {
+            fetch('http://localhost:5000/api/test')
+              .then(res => res.json())
+              .then(json => this.testData = json);
+          }, 1000);
+        }
+      }
+    });
+  </script>
+</body>
+</html>

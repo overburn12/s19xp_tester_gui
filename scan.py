@@ -1,9 +1,13 @@
-import serial
+import serial, os, webview, threading
 import serial.tools.list_ports
 import sys
 import time
 from datetime import datetime
-from test_model import new_test, proccess_line, print_test, deep_compare
+from test_model import new_test, proccess_line, print_test
+
+#-----------------------------------------------------------------------------------------------------------------------
+# serial log replay
+#-----------------------------------------------------------------------------------------------------------------------
 
 class FakeSerial:
     def __init__(self, log_path):
@@ -32,8 +36,7 @@ class FakeSerial:
             return b''
 
         
-
-def replay_log_generator(filepath, speed_up_factor = 10.0):
+def replay_log_generator(filepath, speed_up_factor = 50.0):
     prev_timestamp = None
 
     with open(filepath, 'r') as f:
@@ -56,7 +59,7 @@ def replay_log_generator(filepath, speed_up_factor = 10.0):
 
 
 #-----------------------------------------------------------------------------------------------------------------------
-#
+# helper functions
 #-----------------------------------------------------------------------------------------------------------------------
 
 def save_log(file_path, data):
@@ -93,6 +96,31 @@ def select_port(ports):
             print("That's not a number. Try again.")
 
 
+def get_selected_file(dir='dumps'):
+    files = [f for f in os.listdir(dir) if f.endswith('.txt')]
+
+    if not files:
+        print(f"No.txt files found in the '{dir}' directory.")
+        return None
+    for i, file in enumerate(files):
+        print(f"{str(i).zfill(2)}: {file}")
+    while True:
+        try:
+            selection = int(input("Enter the index of the file to open: "))
+            if 0 <= selection < len(files):
+                break
+            else:
+                print("Invalid index. Please try again.")
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+
+    return f"{dir}/{files[selection]}"
+
+
+#-----------------------------------------------------------------------------------------------------------------------
+# serial read
+#-----------------------------------------------------------------------------------------------------------------------
+
 def read_serial_forever(port_name, baudrate=115200, simulate=False, read_log=""):
     file_name = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
     serial_log = ""
@@ -111,10 +139,10 @@ def read_serial_forever(port_name, baudrate=115200, simulate=False, read_log="")
                     line = ser.readline().decode(errors='replace').strip()
                     modified = proccess_line(line, test)
                     serial_log += line + '\n'
-                    if modified:
+                    if modified: #just print everything and indicate which lines modified the test object
                         print('>>>>> ' + line)
                     #else:
-                        #print("      " + line)
+                    #    print("      " + line)
                 if test['flags']['done']:
                     break
 
@@ -130,17 +158,34 @@ def read_serial_forever(port_name, baudrate=115200, simulate=False, read_log="")
         file_path = f'dumps/{file_name}.txt'
         save_log(file_path, serial_log)
 
+    del test['flags'] #delete flags. only needed internally for data scanning conditions
     print_test(test) #print the test object when the test is over
 
 
+def start_serial_read_thread(port_name, simulate=False, read_log=""):
+    threading.Thread(target=read_serial_forever, args=(port_name, simulate, read_log), daemon=True).start()
+
+
+#-----------------------------------------------------------------------------------------------------------------------
+# main
+#-----------------------------------------------------------------------------------------------------------------------
+
 if __name__ == "__main__":
 
-    simulate = True
-    read_log = "dumps/YNAHYPDBBABCA0KVD-pass.txt"
+    read_log = None
     selected_port = None
+    
+    simulate = True
+    use_webview = False
 
-    if not simulate:
-        ports = list_com_ports()
-        selected_port = select_port(ports)
+    if use_webview:
+        window = webview.create_window("Hashboard Tester", "gui/index.html")
+        webview.start()
+    else:
+        if simulate:
+            read_log = get_selected_file()
+        else:
+            ports = list_com_ports()
+            selected_port = select_port(ports)
 
-    read_serial_forever(port_name=selected_port, simulate=simulate, read_log=read_log)
+        read_serial_forever(port_name=selected_port, simulate=simulate, read_log=read_log)
