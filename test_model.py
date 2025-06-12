@@ -145,14 +145,15 @@ def proccess_line(line, test):
         if 'bad asic list:' in line:
             test['flags']['bad_asic_list'] = True
 
-    if 'asic[' in line:
-        #print ('YO: ' + line)
-        assignments = [x.strip() for x in line.split(',') if x.strip()]
-        for assignment in assignments:
-            left, right = assignment.split('=')
-            index = left.strip().replace('asic[', '').replace(']', '')
-            nonce_count = int(right.strip())
-            test['results']['nonce']['nonce_map'][index] = nonce_count
+    if False:
+        if 'asic[' in line:
+            #print ('YO: ' + line)
+            assignments = [x.strip() for x in line.split(',') if x.strip()]
+            for assignment in assignments:
+                left, right = assignment.split('=')
+                index = left.strip().replace('asic[', '').replace(']', '')
+                nonce_count = int(right.strip())
+                test['results']['nonce']['nonce_map'][index] = nonce_count
 
     if 'APW_power_on' in line:
         val = get_value(line, ":")

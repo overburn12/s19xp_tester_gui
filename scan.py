@@ -1,4 +1,5 @@
-import serial, os, webview, threading
+import serial, os
+#import webview, threading
 import serial.tools.list_ports
 import sys
 import time
@@ -141,8 +142,8 @@ def read_serial_forever(port_name, baudrate=115200, simulate=False, read_log="")
                     serial_log += line + '\n'
                     if modified: #just print everything and indicate which lines modified the test object
                         print('>>>>> ' + line)
-                    #else:
-                    #    print("      " + line)
+                    else:
+                        print("      " + line)
                 if test['flags']['done']:
                     break
 
@@ -152,18 +153,21 @@ def read_serial_forever(port_name, baudrate=115200, simulate=False, read_log="")
         print("\nScanning stopped. Byeee!")
 
     if len(serial_log) > 0 and not simulate:
-        if test['serial'] is not None:
+        if test['id']['serial'] is not None:
             #modify the filename to use the serial instead
-            file_name = test['serial'] 
+            file_name = test['id']['serial'] 
         file_path = f'dumps/{file_name}.txt'
         save_log(file_path, serial_log)
 
     del test['flags'] #delete flags. only needed internally for data scanning conditions
+    del test['read']
+    del test['psu']
+
     print_test(test) #print the test object when the test is over
 
 
-def start_serial_read_thread(port_name, simulate=False, read_log=""):
-    threading.Thread(target=read_serial_forever, args=(port_name, simulate, read_log), daemon=True).start()
+#def start_serial_read_thread(port_name, simulate=False, read_log=""):
+#    threading.Thread(target=read_serial_forever, args=(port_name, simulate, read_log), daemon=True).start()
 
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -175,17 +179,17 @@ if __name__ == "__main__":
     read_log = None
     selected_port = None
     
-    simulate = True
+    simulate = False
     use_webview = False
 
-    if use_webview:
-        window = webview.create_window("Hashboard Tester", "gui/index.html")
-        webview.start()
+    #if use_webview:
+    #    window = webview.create_window("Hashboard Tester", "gui/index.html")
+    #    webview.start()
+    #else:
+    if simulate:
+        read_log = get_selected_file()
     else:
-        if simulate:
-            read_log = get_selected_file()
-        else:
-            ports = list_com_ports()
-            selected_port = select_port(ports)
+        ports = list_com_ports()
+        selected_port = select_port(ports)
 
-        read_serial_forever(port_name=selected_port, simulate=simulate, read_log=read_log)
+    read_serial_forever(port_name=selected_port, simulate=simulate, read_log=read_log)
